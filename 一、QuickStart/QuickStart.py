@@ -34,7 +34,7 @@ class OpenAICompatibleClient:
             )
 
             answer = response.choices[0].message.content
-            print(f"Generated answer: {answer}")
+            print(f"Generated answer: \n{answer}")
             return answer
         except Exception as e:
             return f'错误: 调用OpenAI API失败: {e}'
@@ -114,9 +114,11 @@ def main():
 
     # 可用工具
     - `get_weather(city: str)`: 查询指定城市的实时天气。
+    - `get_attraction(city: str, weather: str)`: 根据城市和天气搜索推荐的旅游景点。
 
-    行动模式：
-    你的回答必须严格遵守以下格式。首先是你的思考过程，然后是你要执行的具体行动，每次回复只输出一对 Thought 和 Action：
+    # 行动模式：
+    首先是你的思考过程，然后是你要执行的具体行动，每次回复只输出一对 Thought 和 Action（必须输出一对），如果某一步重试三次后再遇到问题则报错结束，报错信息由你定义。
+    你的回答必须严格遵守以下格式：
     Thought:[这里是你的思考过程和下一步计划]
     Action:[这里是你要调用的工具，格式为：function_name(arg_name='arg_value')]
 
@@ -129,12 +131,12 @@ def main():
     """
 
     client = OpenAICompatibleClient(
-        model="deepseek-reasoner",
+        model="deepseek-chat",
         api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("OPENAI_API_BASE_URL")
     )
 
-    user_prompt = "帮我查询以下今天广州的天气，根据今天的天气推荐几个合适的旅游景点，输出要详细"
+    user_prompt = "帮我查询今天广州的天气，根据今天的天气推荐几个合适的旅游景点，输出要详细"
     prompt_history = [f'用户请求: {user_prompt}']
 
     print(f"用户输入: {user_prompt}\n" + "=" * 40)
@@ -146,14 +148,14 @@ def main():
         full_prompt = "\n".join(prompt_history)
         llm_output = client.generate(full_prompt, system_prompt=AGENT_SYSTEM_PROMPT)
         # 模型可能会输出多余的 Thought-Action,需要截断
-        match = re.search(r'(Thought:\s*.*?Action:\s*.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)', llm_output,
-                          re.DOTALL)
+        match = re.search(r'(Thought:\s*.*?Action:\s*.*?)(?=\n\s*(?:Thought:|Action:|Observation:)|\Z)',
+                          llm_output, re.DOTALL)
         if match:
             truncated = match.group(1).strip()
             if truncated != llm_output.strip():
                 llm_output = truncated
                 print(f"截断后的输出: {llm_output}")
-        print(f"LLM输出: {llm_output}")
+        print(f"LLM输出: \n{llm_output}")
         prompt_history.append(llm_output)
 
         action_match = re.search(r"Action:\s*(.*)", llm_output, re.DOTALL)
@@ -179,7 +181,7 @@ def main():
             observation = f'错误：未定义工具 "{tool_name}"'
 
         observation_str = f"Observation: {observation}"
-        print(f'{observation_str}\n' + '=' * 40)
+        print(f'{observation_str}\n' + '=' * 80)
         prompt_history.append(observation_str)
 
 
