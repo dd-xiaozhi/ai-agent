@@ -15,10 +15,30 @@ PLANNER_PROMPT_TEMPLATE = """
     ```
     """
 
+EXECUTOR_PROMPT_TEMPLATE = """
+    你是一位顶级的AI执行专家。你的任务是严格按照给定的计划，一步一步解决问题。
+    你将收到原始问题、完整计划、以及到目前为止已经完成的步骤和结果。
+    请专注于解决“当前步骤”，并仅输出该步骤的最终答案，不要输出任何额外的解释和对话。记住只需要输出结果！！！
+    
+    # 原始问题
+    {question}
+    
+    # 完整计划
+    {plan}
+    
+    # 历史执行步骤和结果
+    {history}
+    
+    # 当前步骤
+    {current_step}
+    
+    请输出针对 “当前步骤” 的回答。
+    """
+
 
 class Planner:
-    def __init__(self):
-        self.llmClient = LLMClient(model="deepseek-chat")
+    def __init__(self, llm_client: LLMClient):
+        self.llmClient = llm_client
 
     def plan(self, question):
         """
@@ -28,14 +48,12 @@ class Planner:
         """
         prompt = PLANNER_PROMPT_TEMPLATE.format(question=question)
 
-        message = [
-            { "role": "user", "content": prompt }
-        ]
+        messages = [{"role": "user", "content": prompt}]
 
         print("====================== LLM正在生成执行计划... ======================")
 
-        response_txt = self.llmClient.generate(message=message) or ""
-        print(f"✅ 计划已生成:\n{response_txt}")
+        response_txt = self.llmClient.generate(message=messages, stream=True) or ""
+        print(f"✅ 计划已生成: \n{response_txt}")
 
         # 解析模型输出
         try:
@@ -48,8 +66,63 @@ class Planner:
             return []
 
 
-def main():
-    pass
+class Executor:
+
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
+
+    def execute(self, question: str, plan: list[str]) -> str:
+        # 用于存储历史执行结果
+        history = ""
+        response_text = ""
+        for i, step in enumerate(plan):
+            print(f"------- 正在执行计划 {i} ------")
+
+            prompt = EXECUTOR_PROMPT_TEMPLATE.format(
+                question=question,
+                plan=plan,
+                history=history if history else "无",
+                current_step=step
+            )
+
+            messages = [{"role": "user", "content": prompt}]
+
+            response_text = self.llm_client.generate(message=messages, stream=True) or ""
+
+            # 更新历史执行，为下一步做准备
+            history += f"步骤 {i + 1}: {step}\n结果：{response_text}\n\n"
+
+            print(f"步骤 {i + 1} [ {step} ]  已完成，结果：{response_text}\n")
+
+        print("------- 计划执行完毕 --------\n")
+        # 最后一步就是最终答案
+        return response_text
+
+
+class PlanAndSolveAgent:
+
+    def __init__(self, llm_client: LLMClient):
+        self.llm_client = llm_client
+        self.planner = Planner(llm_client)
+        self.executor = Executor(llm_client)
+
+    def run(self, question: str):
+        print(f'\n--------- 开始处理问题 --------- \n {question}')
+
+        # 1.调用规划器生成执行计划
+        ex_plan = self.planner.plan(question)
+
+        if not ex_plan:
+            print("❌ 无法生成执行计划，请检查问题或联系管理员")
+            return
+
+        # 2.调用执行器执行计划
+        response_text = self.executor.execute(question, ex_plan)
+
+        print(f"最终结果：\n{response_text}")
+
 
 if __name__ == '__main__':
-    main()
+    llm_client = LLMClient(model="deepseek-chat")
+    psa = PlanAndSolveAgent(llm_client)
+    psa.run("爷爷的奶奶的奶奶的爸爸的姐姐的儿子是谁？")
