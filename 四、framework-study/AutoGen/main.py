@@ -5,17 +5,20 @@ from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_agentchat.conditions import TextMentionTermination
 from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.agents import UserProxyAgent
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
 
 def create_openai_model_client():
     """创建配置 OPEN AI 客户端"""
     return OpenAIChatCompletionClient(
-        model="deepseek-chat",
-        api_key=os.getenv("OPENAIx_API_KEY"),
+        model="deepseek-ai/DeepSeek-V3.2",
+        api_key=os.getenv("OPENAI_API_KEY"),
         base_url=os.getenv("OPENAI_API_BASE_URL", "https://api.openai.com/v1"),
         model_info={
             "function_calling": True,
-            "max_tokens": 40960,
+            "max_tokens": 4096,  # Adjusted to a safer default if 40960 is too high for some providers
             "context_length": 32768,
             "vision": False,
             "json_output": True,
@@ -111,7 +114,8 @@ def create_user_proxy():
 3. 验证功能是否符合预期
 4. 提供用户反馈和建议
 
-完成测试后请回复 TERMINATE。""",
+完成测试后请回复 TERMINATE。
+""",
     )
 
 

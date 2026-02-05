@@ -1,0 +1,5 @@
+autogen-agentchat
+autogen-ext
+python-dotenv
+streamlit
+openai
